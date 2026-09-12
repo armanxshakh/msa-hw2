@@ -1,0 +1,38 @@
+apiVersion: apps/v1
+kind: Deployment
+
+metadata:
+  name: msa-hw2
+
+spec:
+  replicas: 2
+
+  selector:
+    matchLabels:
+      app: msa-hw2
+
+  template:
+    metadata:
+      labels:
+        app: msa-hw2
+
+    spec:
+      containers:
+        - name: msa-hw2
+          image: armandockerrr/msa-hw2:latest
+          ports:
+            - containerPort: 8000
+
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 5
+            periodSeconds: 5
+
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 10
+            periodSeconds: 10
