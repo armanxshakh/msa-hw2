@@ -1,0 +1,9 @@
+auth:
+  username: appuser
+  database: usersdb
+  existingSecret: postgres-secret
+
+primary:
+  persistence:
+    enabled: true
+    size: 1Gi

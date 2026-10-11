@@ -1,0 +1,47 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: db-migration
+spec:
+  template:
+    spec:
+      restartPolicy: Never
+
+      containers:
+        - name: db-migration
+          image: postgres:16
+
+          env:
+            - name: PGHOST
+              value: postgres-postgresql
+
+            - name: PGPORT
+              value: "5432"
+
+            - name: PGDATABASE
+              value: usersdb
+
+            - name: PGUSER
+              value: appuser
+
+            - name: PGPASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-secret
+                  key: password
+
+          command:
+            - psql
+            - -f
+            - /migration/migration.sql
+
+          volumeMounts:
+            - name: migration
+              mountPath: /migration
+
+      volumes:
+        - name: migration
+          configMap:
+            name: db-migration
+
+  backoffLimit: 3
