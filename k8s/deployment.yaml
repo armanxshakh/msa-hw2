@@ -1,6 +1,5 @@
 apiVersion: apps/v1
 kind: Deployment
-
 metadata:
   name: msa-hw2
 
@@ -20,8 +19,29 @@ spec:
       containers:
         - name: msa-hw2
           image: armandockerrr/msa-hw2:latest
+          imagePullPolicy: Always
+
           ports:
             - containerPort: 8000
+
+          env:
+            - name: DB_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: msa-hw2-config
+                  key: DB_URL
+
+            - name: DB_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-secret
+                  key: username
+
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-secret
+                  key: password
 
           readinessProbe:
             httpGet:
