@@ -192,3 +192,107 @@ PostgreSQL values:
 ```text
 helm/postgres-values.yaml
 ```
+
+## Мониторинг Prometheus и Grafana
+
+Сервис инструментирован с помощью Spring Boot Actuator и Micrometer для сбора метрик Prometheus.
+
+### Состав мониторинга
+
+Используются:
+
+- Prometheus;
+- Grafana;
+- метрики nginx-ingress-controller;
+- метрики Spring Boot приложения.
+
+Prometheus получает метрики приложения через:
+
+```text
+/actuator/prometheus
+```
+
+Для приложения собираются:
+
+- RPS по API-методам;
+- latency p50 / p95 / p99 / max;
+- количество HTTP 500 ошибок.
+
+Для nginx-ingress-controller собираются:
+
+- общий RPS сервиса;
+- latency p50 / p95 / p99 / max;
+- количество HTTP 500 ошибок.
+
+### Установка Prometheus
+
+```powershell
+helm install prometheus prometheus-community/prometheus `
+  --namespace monitoring `
+  --create-namespace `
+  -f helm/prometheus-values.yaml
+```
+
+### Установка Grafana
+
+```powershell
+helm install grafana grafana-community/grafana `
+  --namespace monitoring `
+  -f helm/grafana-values.yaml
+```
+
+### Включение метрик nginx-ingress-controller
+
+```powershell
+helm upgrade nginx ingress-nginx/ingress-nginx `
+  --namespace m `
+  -f helm/nginx_ingress.yaml
+```
+
+### Открытие Grafana
+
+```powershell
+kubectl port-forward -n monitoring svc/grafana 3000:80
+```
+
+Grafana доступна по адресу:
+
+```text
+http://localhost:3000
+```
+
+### Нагрузочное тестирование
+
+Для генерации нагрузки используется ранее подготовленная Postman/Newman коллекция CRUD-запросов:
+
+```powershell
+newman.cmd run postman\MSA_HW_CRUD.postman_collection.json `
+  -n 300 `
+  --delay-request 200
+```
+
+Нагрузочное тестирование выполнялось в течение примерно 5 минут.
+
+### Grafana Dashboard
+
+Экспортированный dashboard сохранён в:
+
+```text
+grafana/msa-service-monitoring.json
+```
+
+Dashboard содержит следующие панели:
+
+1. RPS по API-методам;
+2. API Latency p50 / p95 / p99 / max;
+3. HTTP 500 Errors по API-методам;
+4. общий RPS nginx-ingress;
+5. Ingress Latency p50 / p95 / p99 / max;
+6. Ingress HTTP 500 Errors.
+
+### Alerting
+
+В Grafana настроены правила оповещения:
+
+- при появлении HTTP 500 ошибок;
+- при превышении p95 latency значения 500 ms.
