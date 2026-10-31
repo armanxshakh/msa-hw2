@@ -1,0 +1,41 @@
+alertmanager:
+  enabled: false
+
+kube-state-metrics:
+  enabled: false
+
+prometheus-node-exporter:
+  enabled: false
+
+prometheus-pushgateway:
+  enabled: false
+
+server:
+  persistentVolume:
+    enabled: false
+
+  retention: "1h"
+
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      memory: 256Mi
+
+extraScrapeConfigs: |
+  - job_name: "msa-hw2"
+    scrape_interval: 15s
+    scrape_timeout: 10s
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets:
+          - "msa-hw2-service.default.svc.cluster.local:80"
+  
+  - job_name: "nginx-ingress"
+    scrape_interval: 15s
+    scrape_timeout: 10s
+    metrics_path: /metrics
+    static_configs:
+      - targets:
+          - "nginx-ingress-nginx-controller-metrics.m.svc.cluster.local:10254"
