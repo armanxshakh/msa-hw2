@@ -296,3 +296,196 @@ Dashboard содержит следующие панели:
 
 - при появлении HTTP 500 ошибок;
 - при превышении p95 latency значения 500 ms.
+
+## Централизованное логирование
+
+Для централизованного сбора и анализа логов используется EFK-стек:
+
+- Elasticsearch;
+- Fluent Bit;
+- Kibana.
+
+Приложение пишет структурированные JSON-логи в stdout. Fluent Bit развёрнут как DaemonSet и автоматически собирает логи Kubernetes-контейнеров, обогащает их метаданными Kubernetes и отправляет в Elasticsearch.
+
+### Структурированное логирование приложения
+
+В логах фиксируются:
+
+- запуск и остановка приложения — `INFO`;
+- входящие HTTP-запросы: метод, путь, IP — `INFO`;
+- успешные CRUD-операции — `INFO`;
+- ошибки валидации — `WARN`;
+- ошибки БД и приложения — `ERROR`;
+- начало и завершение Job миграции — `INFO`.
+
+Для CRUD-операций используются дополнительные структурированные поля:
+
+```text
+operation
+user_id
+```
+
+Для HTTP-запросов:
+
+```text
+http_method
+path
+client_ip
+status
+duration_ms
+```
+
+Для ошибок:
+
+```text
+error_type
+```
+
+### Namespace для EFK
+
+```powershell
+kubectl create namespace logging
+```
+
+### Установка Elasticsearch
+
+```powershell
+kubectl apply -f k8s/logging/01-elasticsearch-services.yaml
+kubectl apply -f k8s/logging/02-elasticsearch-statefulset.yaml
+```
+
+### Установка Kibana
+
+```powershell
+kubectl apply -f k8s/logging/03-kibana.yaml
+```
+
+### Установка Fluent Bit
+
+```powershell
+kubectl apply -f k8s/logging/04-fluent-bit-configmap.yaml
+kubectl apply -f k8s/logging/05-fluent-bit-daemonset.yaml
+```
+
+### Проверка компонентов
+
+```powershell
+kubectl get pods -n logging
+```
+
+Ожидаемые компоненты:
+
+```text
+elasticsearch-0
+kibana-...
+fluent-bit-...
+```
+
+### Открытие Kibana
+
+```powershell
+minikube service kibana -n logging --url
+```
+
+### Elasticsearch
+
+Для локального доступа:
+
+```powershell
+kubectl port-forward -n logging svc/elasticsearch 9200:9200
+```
+
+Проверка индексов:
+
+```powershell
+curl.exe "http://localhost:9200/_cat/indices?v"
+```
+
+Fluent Bit создаёт индексы:
+
+```text
+fluent-bit-logs-*
+```
+
+### Kibana Data View
+
+В Kibana:
+
+```text
+Stack Management → Data Views → Create data view
+```
+
+Настройки:
+
+```text
+Name: fluent-bit-logs
+Index pattern: fluent-bit-logs-*
+Timestamp field: @timestamp
+```
+
+### Примеры фильтров в Discover
+
+Логи приложения:
+
+```text
+kubernetes.namespace_name: "default" AND kubernetes.pod_name: msa-hw2-*
+```
+
+INFO:
+
+```text
+level: "INFO"
+```
+
+Ошибки валидации:
+
+```text
+level: "WARN" AND error_type: "VALIDATION_ERROR"
+```
+
+Ошибки БД:
+
+```text
+level: "ERROR" AND error_type: "DATABASE_ERROR"
+```
+
+Создание пользователя:
+
+```text
+level: "INFO" AND operation: "CREATE"
+```
+
+Поиск конкретного пользователя:
+
+```text
+user_id: 1
+```
+
+Логи миграции БД:
+
+```text
+service: "db-migration"
+```
+
+### Перезапуск Job миграции
+
+```powershell
+kubectl delete job db-migration
+kubectl apply -f k8s/02-db-migration-job.yaml
+kubectl logs job/db-migration
+```
+
+В логах Job фиксируются события:
+
+```text
+MIGRATION_START
+MIGRATION_FINISH
+```
+
+### Скриншоты
+
+Скриншоты работы Kibana находятся в:
+
+```text
+docs/logging/
+```
