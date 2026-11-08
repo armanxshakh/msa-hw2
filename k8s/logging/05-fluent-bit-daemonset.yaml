@@ -48,6 +48,7 @@ spec:
     metadata:
       labels:
         app: fluent-bit
+
     spec:
       serviceAccountName: fluent-bit
 
@@ -66,14 +67,24 @@ spec:
           volumeMounts:
             - name: varlog
               mountPath: /var/log
+              readOnly: true
+
+            - name: varlib
+              mountPath: /var/lib/fluent-bit
 
             - name: config
               mountPath: /fluent-bit/etc/
+              readOnly: true
 
       volumes:
         - name: varlog
           hostPath:
             path: /var/log
+
+        - name: varlib
+          hostPath:
+            path: /var/lib/fluent-bit
+            type: DirectoryOrCreate
 
         - name: config
           configMap:

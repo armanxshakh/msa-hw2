@@ -18,7 +18,7 @@ data:
         multiline.parser  docker, cri
         Mem_Buf_Limit     5MB
         Skip_Long_Lines   On
-        DB                /var/log/flb_kube.db
+        DB                /var/lib/fluent-bit/flb_kube.db
 
     [FILTER]
         Name                kubernetes
