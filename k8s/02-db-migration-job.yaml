@@ -31,9 +31,17 @@ spec:
                   key: password
 
           command:
-            - psql
-            - -f
-            - /migration/migration.sql
+            - /bin/sh
+            - -c
+            - |
+              echo '{"level":"INFO","service":"db-migration","event":"MIGRATION_START","message":"Database migration started"}'
+
+              if psql -v ON_ERROR_STOP=1 -f /migration/migration.sql; then
+                echo '{"level":"INFO","service":"db-migration","event":"MIGRATION_FINISH","message":"Database migration completed"}'
+              else
+                echo '{"level":"ERROR","service":"db-migration","event":"MIGRATION_FAILED","message":"Database migration failed"}'
+                exit 1
+              fi
 
           volumeMounts:
             - name: migration

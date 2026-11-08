@@ -1,6 +1,8 @@
 package com.example.msahw2;
 
 import jakarta.persistence.*;
+import jakarta.validation.constraints.Email;
+import jakarta.validation.constraints.NotBlank;
 
 @Entity
 @Table(name = "users")
@@ -10,14 +12,20 @@ public class User {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @NotBlank(message = "username must not be empty")
     private String username;
 
+    @NotBlank(message = "firstName must not be empty")
     private String firstName;
 
+    @NotBlank(message = "lastName must not be empty")
     private String lastName;
 
+    @NotBlank(message = "email must not be empty")
+    @Email(message = "email must be valid")
     private String email;
 
+    @NotBlank(message = "phone must not be empty")
     private String phone;
 
     public User() {
