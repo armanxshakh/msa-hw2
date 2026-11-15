@@ -489,3 +489,191 @@ MIGRATION_FINISH
 ```text
 docs/logging/
 ```
+
+## HW7 — Аутентификация и BFF
+
+### Архитектура
+
+Для реализации безопасного доступа к пользовательскому профилю используется Spring Boot приложение с Spring Security и JWT.
+
+Основные компоненты:
+
+- nginx-ingress — точка входа по адресу `http://arch.homework`;
+- Spring Boot BFF/API — регистрация, аутентификация и работа с профилем;
+- Spring Security — проверка JWT и контроль доступа;
+- PostgreSQL — хранение пользователей и профилей;
+- BCrypt — хранение паролей в виде хеша.
+
+Архитектурная схема:
+
+```text
+docs/hw7/HW7_Auth_BFF_Architecture.png
+```
+
+Исходник схемы в формате draw.io:
+
+```text
+docs/hw7/HW7_Auth_BFF_Architecture.drawio
+```
+
+### API
+
+Регистрация пользователя:
+
+```text
+POST /auth/register
+```
+
+Аутентификация пользователя:
+
+```text
+POST /auth/login
+```
+
+При успешной аутентификации возвращается JWT access token.
+
+Получение собственного профиля:
+
+```text
+GET /profile
+```
+
+Изменение собственного профиля:
+
+```text
+PUT /profile
+```
+
+Для защищённых запросов используется заголовок:
+
+```text
+Authorization: Bearer <JWT>
+```
+
+Дополнительно реализована проверка доступа по идентификатору профиля:
+
+```text
+GET /profile/{id}
+PUT /profile/{id}
+```
+
+Пользователь имеет доступ только к собственному профилю. Попытка пользователя получить или изменить профиль другого пользователя возвращает:
+
+```text
+403 Forbidden
+```
+
+Запрос профиля без аутентификации возвращает:
+
+```text
+401 Unauthorized
+```
+
+### Установка приложения
+
+Приложение устанавливается в namespace:
+
+```text
+default
+```
+
+PostgreSQL:
+
+```powershell
+helm install postgres `
+  oci://registry-1.docker.io/bitnamicharts/postgresql `
+  -f helm/postgres-values.yaml
+```
+
+Применение Secret и ConfigMap:
+
+```powershell
+kubectl apply -f k8s/00-postgres-secret.yaml
+kubectl apply -f k8s/01-migration-configmap.yaml
+```
+
+Запуск миграции:
+
+```powershell
+kubectl delete job db-migration --ignore-not-found
+kubectl apply -f k8s/02-db-migration-job.yaml
+kubectl logs -f job/db-migration
+```
+
+Установка приложения:
+
+```powershell
+kubectl apply -f k8s/03-app-configmap.yaml
+kubectl apply -f k8s/deployment.yaml
+kubectl apply -f k8s/service.yaml
+kubectl apply -f k8s/ingress.yaml
+```
+
+Проверка:
+
+```powershell
+kubectl get pods
+```
+
+Приложение доступно по адресу:
+
+```text
+http://arch.homework
+```
+
+В качестве API Gateway используется существующий `nginx-ingress`. Отдельный API Gateway не используется.
+
+### Postman / Newman
+
+Postman collection:
+
+```text
+postman/HW7-Auth-BFF.postman_collection.json
+```
+
+Коллекция выполняет следующий сценарий:
+
+1. Регистрация User 1.
+2. Проверка недоступности чтения профиля без аутентификации — `401`.
+3. Проверка недоступности изменения профиля без аутентификации — `401`.
+4. Вход User 1 и получение JWT.
+5. Изменение профиля User 1.
+6. Проверка сохранения изменённых данных.
+7. Регистрация User 2.
+8. Вход User 2.
+9. Проверка невозможности чтения профиля User 1 пользователем User 2 — `403`.
+10. Проверка невозможности изменения профиля User 1 пользователем User 2 — `403`.
+
+При каждом запуске используются случайно сгенерированные данные пользователей.
+
+Базовый URL передаётся через переменную:
+
+```text
+{{baseUrl}}
+```
+
+Для запуска через Newman:
+
+```powershell
+newman run postman/HW7-Auth-BFF.postman_collection.json `
+  --env-var "baseUrl=http://arch.homework" `
+  --verbose
+```
+
+При запуске в консоли отображаются:
+
+- HTTP method;
+- URL запроса;
+- request body;
+- HTTP status;
+- response body.
+
+Успешный тестовый запуск:
+
+```text
+requests:   10
+failed:     0
+
+assertions: 13
+failed:     0
+```

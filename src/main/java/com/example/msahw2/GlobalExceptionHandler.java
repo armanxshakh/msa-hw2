@@ -9,6 +9,7 @@ import org.springframework.transaction.CannotCreateTransactionException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -73,5 +74,18 @@ public class GlobalExceptionHandler {
                 .body(Map.of(
                         "error", "Internal server error"
                 ));
+    }
+
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    public ResponseEntity<Map<String, String>> handleInvalidJson(
+            HttpMessageNotReadableException ex) {
+
+        log.atWarn()
+                .addKeyValue("error_type", "INVALID_JSON")
+                .log("Invalid JSON request");
+
+        return ResponseEntity
+                .badRequest()
+                .body(Map.of("error", "Invalid request body"));
     }
 }

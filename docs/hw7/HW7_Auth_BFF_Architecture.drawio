@@ -1,0 +1,76 @@
+<mxfile host="app.diagrams.net" modified="2026-11-15T12:00:00.000Z" agent="ChatGPT" version="24.7.17">
+  <diagram id="hw7-auth-bff" name="HW7 Auth BFF Architecture">
+    <mxGraphModel dx="1600" dy="1000" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1600" pageHeight="1000" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+
+        <mxCell id="title" value="HW7 — Архитектура BFF с JWT авторизацией" style="text;html=1;align=left;verticalAlign=middle;fontSize=28;fontStyle=1;fontColor=#0B1F3A;" vertex="1" parent="1">
+          <mxGeometry x="40" y="30" width="900" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="subtitle" value="Схема взаимодействия компонентов и потоков авторизации" style="text;html=1;align=left;verticalAlign=middle;fontSize=16;fontColor=#314A67;" vertex="1" parent="1">
+          <mxGeometry x="40" y="75" width="850" height="30" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="client" value="&lt;b&gt;Client&lt;/b&gt;&lt;br&gt;(Postman / Web / Mobile)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E8E7FF;strokeColor=#6C63B8;fontSize=18;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="60" y="250" width="220" height="130" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="backend_group" value="&lt;b&gt;Backend / BFF&lt;/b&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EAF4FF;strokeColor=#3A7CC1;fontSize=20;fontStyle=1;verticalAlign=top;spacingTop=12;" vertex="1" parent="1">
+          <mxGeometry x="360" y="150" width="850" height="430" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="bff" value="&lt;b&gt;Spring Boot BFF / API&lt;/b&gt;&lt;br&gt;&lt;br&gt;• Маршрутизация запросов&lt;br&gt;• Проверка JWT&lt;br&gt;• Контроль доступа&lt;br&gt;• Единый API для клиента" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#DCEEFF;strokeColor=#2C5F99;fontSize=17;" vertex="1" parent="1">
+          <mxGeometry x="410" y="235" width="260" height="220" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="auth" value="&lt;b&gt;Auth&lt;/b&gt;&lt;br&gt;&lt;br&gt;POST /auth/register&lt;br&gt;POST /auth/login&lt;br&gt;&lt;br&gt;• Регистрация&lt;br&gt;• BCrypt&lt;br&gt;• Выпуск JWT" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#DCF6E5;strokeColor=#3A8F5A;fontSize=16;" vertex="1" parent="1">
+          <mxGeometry x="760" y="195" width="300" height="170" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="profile" value="&lt;b&gt;Profile&lt;/b&gt;&lt;br&gt;&lt;br&gt;GET /profile&lt;br&gt;PUT /profile&lt;br&gt;GET /profile/{id}&lt;br&gt;PUT /profile/{id}&lt;br&gt;&lt;br&gt;• Только владелец профиля&lt;br&gt;• Чужой профиль → 403" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFF3C9;strokeColor=#C49A2C;fontSize=16;" vertex="1" parent="1">
+          <mxGeometry x="760" y="385" width="300" height="180" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="db" value="&lt;b&gt;PostgreSQL&lt;/b&gt;&lt;br&gt;&lt;br&gt;users&lt;br&gt;id&lt;br&gt;username&lt;br&gt;profile data&lt;br&gt;password hash" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;fillColor=#EEEAFE;strokeColor=#5D55A8;fontSize=16;" vertex="1" parent="1">
+          <mxGeometry x="1280" y="260" width="180" height="190" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="e1" value="HTTP / JSON" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;fontSize=14;" edge="1" parent="1" source="client" target="bff">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e2" value="/auth/register&#xa;/auth/login" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;fontSize=14;" edge="1" parent="1" source="bff" target="auth">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e3" value="/profile&#xa;/profile/{id}" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;fontSize=14;" edge="1" parent="1" source="bff" target="profile">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e4" value="JPA" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;fontSize=14;" edge="1" parent="1" source="auth" target="db">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e5" value="JPA" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;fontSize=14;" edge="1" parent="1" source="profile" target="db">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="flow1" value="1. Регистрация / вход&lt;br&gt;Client → /auth/register или /auth/login → JWT" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F5F7FA;strokeColor=#AAB7C4;fontSize=15;" vertex="1" parent="1">
+          <mxGeometry x="80" y="650" width="430" height="90" as="geometry"/>
+        </mxCell>
+        <mxCell id="flow2" value="2. Работа со своим профилем&lt;br&gt;JWT → GET /profile / PUT /profile → 200 OK" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F5F7FA;strokeColor=#AAB7C4;fontSize=15;" vertex="1" parent="1">
+          <mxGeometry x="560" y="650" width="430" height="90" as="geometry"/>
+        </mxCell>
+        <mxCell id="flow3" value="3. Доступ к чужому профилю&lt;br&gt;User 2 → /profile/{user1Id} → 403 Forbidden" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F5F7FA;strokeColor=#AAB7C4;fontSize=15;" vertex="1" parent="1">
+          <mxGeometry x="1040" y="650" width="430" height="90" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="security" value="&lt;b&gt;Безопасность&lt;/b&gt;&lt;br&gt;• BCrypt для паролей&lt;br&gt;• Stateless JWT&lt;br&gt;• Spring Security&lt;br&gt;• 401 без токена&lt;br&gt;• 403 при доступе к чужому профилю" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFF0F0;strokeColor=#C96A6A;fontSize=15;" vertex="1" parent="1">
+          <mxGeometry x="80" y="790" width="430" height="150" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="api" value="&lt;b&gt;API&lt;/b&gt;&lt;br&gt;POST /auth/register — регистрация&lt;br&gt;POST /auth/login — вход и JWT&lt;br&gt;GET /profile — свой профиль&lt;br&gt;PUT /profile — обновить свой профиль&lt;br&gt;GET /profile/{id} — только свой, иначе 403&lt;br&gt;PUT /profile/{id} — только свой, иначе 403" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F6FBFF;strokeColor=#7BA3C9;fontSize=15;" vertex="1" parent="1">
+          <mxGeometry x="560" y="790" width="910" height="150" as="geometry"/>
+        </mxCell>
+
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

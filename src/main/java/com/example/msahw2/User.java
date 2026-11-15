@@ -28,6 +28,9 @@ public class User {
     @NotBlank(message = "phone must not be empty")
     private String phone;
 
+    @NotBlank(message = "password must not be empty")
+    private String password;
+
     public User() {
     }
 
@@ -77,5 +80,13 @@ public class User {
 
     public void setPhone(String phone) {
         this.phone = phone;
+    }
+
+    public String getPassword() {
+        return password;
+    }
+
+    public void setPassword(String password) {
+        this.password = password;
     }
 }
