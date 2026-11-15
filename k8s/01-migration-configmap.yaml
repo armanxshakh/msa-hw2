@@ -12,3 +12,6 @@ data:
         email VARCHAR(255),
         phone VARCHAR(255)
     );
+    
+    ALTER TABLE users
+    ADD COLUMN IF NOT EXISTS password VARCHAR(255);
