@@ -5,6 +5,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.kafka.core.KafkaTemplate;
 
 import java.util.Map;
 
@@ -15,16 +16,18 @@ public class AuthController {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
-
+    private final KafkaTemplate<String, UserCreatedEvent> kafkaTemplate;
 
     public AuthController(
             UserRepository userRepository,
             PasswordEncoder passwordEncoder,
-            JwtService jwtService) {
+            JwtService jwtService,
+            KafkaTemplate<String, UserCreatedEvent> kafkaTemplate) {
 
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.jwtService = jwtService;
+        this.kafkaTemplate = kafkaTemplate;
     }
 
     @PostMapping("/register")
@@ -56,6 +59,18 @@ public class AuthController {
         );
 
         User savedUser = userRepository.save(user);
+
+        UserCreatedEvent event = new UserCreatedEvent(
+                savedUser.getId(),
+                savedUser.getUsername(),
+                savedUser.getEmail()
+        );
+
+        kafkaTemplate.send(
+                "user-created",
+                savedUser.getId().toString(),
+                event
+        );
 
         return ResponseEntity
                 .status(HttpStatus.CREATED)

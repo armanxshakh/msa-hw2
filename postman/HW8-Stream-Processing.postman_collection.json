@@ -1,0 +1,473 @@
+{
+  "info": {
+    "_postman_id": "6dcf8912-7d43-4c3c-9ac6-6f6f2788a801",
+    "name": "HW8 - Stream Processing",
+    "description": "HW8 Stream Processing: register -> billing via Kafka -> deposit -> successful order -> balance decreased -> success notification -> failed order -> balance unchanged -> failure notification.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://arch.homework",
+      "type": "string"
+    },
+    {
+      "key": "userId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "successOrderId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "failedOrderId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "initialDeposit",
+      "value": "1000",
+      "type": "string"
+    },
+    {
+      "key": "successPrice",
+      "value": "300",
+      "type": "string"
+    },
+    {
+      "key": "expectedBalance",
+      "value": "700",
+      "type": "string"
+    },
+    {
+      "key": "failedPrice",
+      "value": "1000",
+      "type": "string"
+    }
+  ],
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "const resolvedUrl = pm.variables.replaceIn(pm.request.url.toString());",
+          "console.log('REQUEST:', pm.request.method, resolvedUrl);",
+          "if (pm.request.body && pm.request.body.mode === 'raw') console.log('REQUEST BODY:', pm.variables.replaceIn(pm.request.body.raw || ''));"
+        ]
+      }
+    },
+    {
+      "listen": "test",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "console.log('RESPONSE STATUS:', pm.response.code);",
+          "console.log('RESPONSE BODY:', pm.response.text());"
+        ]
+      }
+    }
+  ],
+  "item": [
+    {
+      "name": "1. Register user",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/auth/register",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "auth",
+            "register"
+          ]
+        },
+        "description": "Creates a unique user. The user-created Kafka event must create a billing account asynchronously.",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"username\": \"{{username}}\",\n  \"firstName\": \"Arman\",\n  \"lastName\": \"Stream\",\n  \"email\": \"{{email}}\",\n  \"phone\": \"77770000001\",\n  \"password\": \"Password123!\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const suffix = Date.now().toString() + Math.floor(Math.random() * 1000).toString();",
+              "pm.collectionVariables.set('username', 'stream_' + suffix);",
+              "pm.collectionVariables.set('email', 'stream_' + suffix + '@test.com');"
+            ]
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('1. User created: HTTP 201', () => pm.response.to.have.status(201));",
+              "const json = pm.response.json();",
+              "pm.test('1. Response contains user id', () => pm.expect(json.id).to.exist);",
+              "pm.collectionVariables.set('userId', String(json.id));",
+              "pm.test('1. Username is correct', () => pm.expect(json.username).to.eql(pm.collectionVariables.get('username')));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "2. Deposit 1000",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/billing/{{userId}}/deposit",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "billing",
+            "{{userId}}",
+            "deposit"
+          ]
+        },
+        "description": "Deposits 1000. The pre-request script waits for the async billing account creation.",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"amount\": {{initialDeposit}}\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const baseUrl = pm.variables.get('baseUrl') || 'http://arch.homework';",
+              "const userId = pm.collectionVariables.get('userId');",
+              "let attempts = 0; const maxAttempts = 12;",
+              "function waitForBillingAccount(){ attempts++; pm.sendRequest(`${baseUrl}/billing/${userId}`, (err,res)=>{ if(!err && res.code===200){ console.log(`Billing account ready after ${attempts} attempt(s)`); return; } if(attempts<maxAttempts) setTimeout(waitForBillingAccount,500); else console.warn('Billing account was not ready before deposit request'); }); }",
+              "waitForBillingAccount();"
+            ]
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('2. Deposit successful: HTTP 200', () => pm.response.to.have.status(200));",
+              "const json = pm.response.json();",
+              "pm.test('2. Billing account belongs to created user', () => pm.expect(String(json.userId)).to.eql(pm.collectionVariables.get('userId')));",
+              "pm.test('2. Balance is 1000 after deposit', () => pm.expect(Number(json.balance)).to.eql(Number(pm.collectionVariables.get('initialDeposit'))));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "3. Create successful order (300)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/orders",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "orders"
+          ]
+        },
+        "description": "Creates an order for 300; billing should deduct funds and emit payment-result.",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"userId\": {{userId}},\n  \"price\": {{successPrice}}\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('3. Order created: HTTP 200', () => pm.response.to.have.status(200));",
+              "const json = pm.response.json();",
+              "pm.test('3. New order starts as PENDING', () => pm.expect(json.status).to.eql('PENDING'));",
+              "pm.collectionVariables.set('successOrderId', String(json.id));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "4. Check balance decreased and order PAID",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/billing/{{userId}}",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "billing",
+            "{{userId}}"
+          ]
+        },
+        "description": "Verifies balance 700 and successful order status PAID."
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "setTimeout(function(){}, 1200);"
+            ]
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('4. Billing response: HTTP 200', () => pm.response.to.have.status(200));",
+              "const json = pm.response.json();",
+              "pm.test('4. Balance decreased from 1000 to 700', () => pm.expect(Number(json.balance)).to.eql(Number(pm.collectionVariables.get('expectedBalance'))));",
+              "const baseUrl = pm.variables.get('baseUrl') || 'http://arch.homework';",
+              "const orderId = pm.collectionVariables.get('successOrderId'); let attempts = 0;",
+              "function checkPaid(){ attempts++; pm.sendRequest(`${baseUrl}/orders/${orderId}`, (err,res)=>{ if(!err && res.code===200 && res.json().status==='PAID'){ pm.test('4. Successful order status is PAID', () => pm.expect(res.json().status).to.eql('PAID')); return; } if(attempts<10) setTimeout(checkPaid,300); else pm.test('4. Successful order status is PAID', () => pm.expect.fail('Order did not become PAID in time')); }); }",
+              "checkPaid();"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "5. Check success notification",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/notifications/{{userId}}",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "notifications",
+            "{{userId}}"
+          ]
+        },
+        "description": "Verifies that the success notification was saved."
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "setTimeout(function(){}, 800);"
+            ]
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('5. Notifications response: HTTP 200', () => pm.response.to.have.status(200));",
+              "const notifications = pm.response.json();",
+              "const successOrderId = Number(pm.collectionVariables.get('successOrderId'));",
+              "const successNotification = notifications.find(n => Number(n.orderId) === successOrderId);",
+              "pm.test('5. Success notification exists', () => pm.expect(successNotification).to.exist);",
+              "pm.test('5. Subject is Письмо счастья', () => pm.expect(successNotification.subject).to.eql('Письмо счастья'));",
+              "pm.test('5. Notification belongs to created user', () => pm.expect(String(successNotification.userId)).to.eql(pm.collectionVariables.get('userId')));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "6. Create failed order (1000)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/orders",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "orders"
+          ]
+        },
+        "description": "Creates an order for 1000 while only 700 remains.",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"userId\": {{userId}},\n  \"price\": {{failedPrice}}\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('6. Insufficient-funds order created: HTTP 200', () => pm.response.to.have.status(200));",
+              "const json = pm.response.json();",
+              "pm.test('6. New order starts as PENDING', () => pm.expect(json.status).to.eql('PENDING'));",
+              "pm.collectionVariables.set('failedOrderId', String(json.id));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "7. Check balance unchanged and order FAILED",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/billing/{{userId}}",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "billing",
+            "{{userId}}"
+          ]
+        },
+        "description": "Verifies balance remains 700 and the second order becomes FAILED."
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "setTimeout(function(){}, 1200);"
+            ]
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('7. Billing response: HTTP 200', () => pm.response.to.have.status(200));",
+              "const json = pm.response.json();",
+              "pm.test('7. Balance remains 700 after failed payment', () => pm.expect(Number(json.balance)).to.eql(Number(pm.collectionVariables.get('expectedBalance'))));",
+              "const baseUrl = pm.variables.get('baseUrl') || 'http://arch.homework';",
+              "const orderId = pm.collectionVariables.get('failedOrderId'); let attempts = 0;",
+              "function checkFailed(){ attempts++; pm.sendRequest(`${baseUrl}/orders/${orderId}`, (err,res)=>{ if(!err && res.code===200 && res.json().status==='FAILED'){ pm.test('7. Insufficient-funds order status is FAILED', () => pm.expect(res.json().status).to.eql('FAILED')); return; } if(attempts<10) setTimeout(checkFailed,300); else pm.test('7. Insufficient-funds order status is FAILED', () => pm.expect.fail('Order did not become FAILED in time')); }); }",
+              "checkFailed();"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "8. Check failure notification",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/notifications/{{userId}}",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "notifications",
+            "{{userId}}"
+          ]
+        },
+        "description": "Verifies the failure notification and confirms both success/failure messages exist."
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "setTimeout(function(){}, 800);"
+            ]
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('8. Notifications response: HTTP 200', () => pm.response.to.have.status(200));",
+              "const notifications = pm.response.json();",
+              "const successOrderId = Number(pm.collectionVariables.get('successOrderId'));",
+              "const failedOrderId = Number(pm.collectionVariables.get('failedOrderId'));",
+              "const successNotification = notifications.find(n => Number(n.orderId) === successOrderId);",
+              "const failedNotification = notifications.find(n => Number(n.orderId) === failedOrderId);",
+              "pm.test('8. Two notifications exist for both test orders', () => { pm.expect(successNotification).to.exist; pm.expect(failedNotification).to.exist; });",
+              "pm.test('8. Failed-payment subject is Письмо горя', () => pm.expect(failedNotification.subject).to.eql('Письмо горя'));",
+              "pm.test('8. Failure notification belongs to created user', () => pm.expect(String(failedNotification.userId)).to.eql(pm.collectionVariables.get('userId')));"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}
