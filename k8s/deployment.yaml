@@ -43,6 +43,9 @@ spec:
                   name: postgres-secret
                   key: password
 
+            - name: KAFKA_BOOTSTRAP_SERVERS
+              value: kafka.default.svc.cluster.local:9092
+
           startupProbe:
             httpGet:
               path: /health

@@ -1,0 +1,172 @@
+asyncapi: 3.0.0
+info:
+  title: HW8 Stream Processing Kafka Events
+  version: 1.0.0
+  description: |
+    Kafka-события для Event Collaboration архитектуры HW8.
+
+servers:
+  kafka:
+    host: kafka.default.svc.cluster.local:9092
+    protocol: kafka
+    description: Kafka broker внутри Kubernetes
+
+channels:
+  userCreated:
+    address: user-created
+    messages:
+      userCreatedMessage:
+        $ref: '#/components/messages/UserCreatedEvent'
+
+  orderCreated:
+    address: order-created
+    messages:
+      orderCreatedMessage:
+        $ref: '#/components/messages/OrderCreatedEvent'
+
+  paymentResult:
+    address: payment-result
+    messages:
+      paymentResultMessage:
+        $ref: '#/components/messages/PaymentResultEvent'
+
+operations:
+  userServicePublishesUserCreated:
+    action: send
+    channel:
+      $ref: '#/channels/userCreated'
+    summary: User Service публикует событие после регистрации пользователя
+
+  billingConsumesUserCreated:
+    action: receive
+    channel:
+      $ref: '#/channels/userCreated'
+    summary: Billing Service создаёт billing account
+
+  orderServicePublishesOrderCreated:
+    action: send
+    channel:
+      $ref: '#/channels/orderCreated'
+    summary: Order Service публикует событие после создания заказа
+
+  billingConsumesOrderCreated:
+    action: receive
+    channel:
+      $ref: '#/channels/orderCreated'
+    summary: Billing Service проверяет баланс и при успехе списывает средства
+
+  billingPublishesPaymentResult:
+    action: send
+    channel:
+      $ref: '#/channels/paymentResult'
+    summary: Billing Service публикует результат оплаты
+
+  orderConsumesPaymentResult:
+    action: receive
+    channel:
+      $ref: '#/channels/paymentResult'
+    summary: Order Service меняет статус заказа на PAID или FAILED
+
+  notificationConsumesPaymentResult:
+    action: receive
+    channel:
+      $ref: '#/channels/paymentResult'
+    summary: Notification Service сохраняет письмо счастья или письмо горя
+
+components:
+  messages:
+    UserCreatedEvent:
+      name: UserCreatedEvent
+      title: Пользователь создан
+      payload:
+        $ref: '#/components/schemas/UserCreatedEvent'
+
+    OrderCreatedEvent:
+      name: OrderCreatedEvent
+      title: Заказ создан
+      payload:
+        $ref: '#/components/schemas/OrderCreatedEvent'
+
+    PaymentResultEvent:
+      name: PaymentResultEvent
+      title: Результат оплаты
+      payload:
+        $ref: '#/components/schemas/PaymentResultEvent'
+
+  schemas:
+    UserCreatedEvent:
+      type: object
+      required:
+        - userId
+        - username
+        - email
+      properties:
+        userId:
+          type: integer
+          format: int64
+          example: 20
+        username:
+          type: string
+          example: stream_001
+        email:
+          type: string
+          format: email
+          example: stream_001@test.com
+
+    OrderCreatedEvent:
+      type: object
+      required:
+        - orderId
+        - userId
+        - email
+        - price
+      properties:
+        orderId:
+          type: integer
+          format: int64
+          example: 4
+        userId:
+          type: integer
+          format: int64
+          example: 20
+        email:
+          type: string
+          format: email
+          example: stream_001@test.com
+        price:
+          type: number
+          format: double
+          example: 300
+
+    PaymentResultEvent:
+      type: object
+      required:
+        - orderId
+        - userId
+        - email
+        - amount
+        - success
+        - message
+      properties:
+        orderId:
+          type: integer
+          format: int64
+          example: 4
+        userId:
+          type: integer
+          format: int64
+          example: 20
+        email:
+          type: string
+          format: email
+          example: stream_001@test.com
+        amount:
+          type: number
+          format: double
+          example: 300
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+          example: Payment successful
