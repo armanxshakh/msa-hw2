@@ -1,0 +1,1039 @@
+{
+  "info": {
+    "_postman_id": "b7c74f5e-f3d1-4c26-a2c3-000000000009",
+    "name": "HW9 - Distributed Transactions - Saga (Repeatable)",
+    "description": "HW9 Distributed Transactions using Saga Orchestration. Repeatable collection: generates unique user, product IDs and delivery slots for every run. Tests successful Saga, Delivery failure compensation, and Warehouse failure compensation.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "arch.homework",
+      "type": "string"
+    },
+    {
+      "key": "runId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "username",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "email",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "userId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "productId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "missingProductId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "successSlot",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "deliveryFailureSlot",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "warehouseFailureSlot",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "depositAmount",
+      "value": "1000",
+      "type": "string"
+    },
+    {
+      "key": "initialStock",
+      "value": "10",
+      "type": "string"
+    },
+    {
+      "key": "successQty",
+      "value": "2",
+      "type": "string"
+    },
+    {
+      "key": "successPrice",
+      "value": "300",
+      "type": "string"
+    },
+    {
+      "key": "deliveryFailureQty",
+      "value": "1",
+      "type": "string"
+    },
+    {
+      "key": "deliveryFailurePrice",
+      "value": "100",
+      "type": "string"
+    },
+    {
+      "key": "warehouseFailureQty",
+      "value": "1",
+      "type": "string"
+    },
+    {
+      "key": "warehouseFailurePrice",
+      "value": "50",
+      "type": "string"
+    },
+    {
+      "key": "successOrderId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "deliveryFailedOrderId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "warehouseFailedOrderId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "balanceAfterSuccess",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "stockAvailableAfterSuccess",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "stockReservedAfterSuccess",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "const url = pm.variables.replaceIn(pm.request.url.toString());",
+          "console.log('REQUEST:', pm.request.method, url);",
+          "if (pm.request.body && pm.request.body.mode === 'raw') {",
+          "    console.log('REQUEST BODY:', pm.variables.replaceIn(pm.request.body.raw || ''));",
+          "}"
+        ]
+      }
+    },
+    {
+      "listen": "test",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "console.log('RESPONSE STATUS:', pm.response.code);",
+          "console.log('RESPONSE BODY:', pm.response.text());"
+        ]
+      }
+    }
+  ],
+  "item": [
+    {
+      "name": "1. Register unique user",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "http://{{baseUrl}}/auth/register",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "protocol": "http",
+          "path": [
+            "auth",
+            "register"
+          ]
+        },
+        "description": "Creates a unique user and initializes unique test data for this Newman run.",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"username\": \"{{username}}\",\n  \"firstName\": \"Arman\",\n  \"lastName\": \"Saga\",\n  \"email\": \"{{email}}\",\n  \"phone\": \"77770000009\",\n  \"password\": \"Password123!\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const now = Date.now().toString();",
+              "const randomPart = Math.floor(Math.random() * 10000).toString().padStart(4, '0');",
+              "const runId = now + randomPart;",
+              "pm.collectionVariables.set('runId', runId);",
+              "pm.collectionVariables.set('username', 'saga_' + runId);",
+              "pm.collectionVariables.set('email', 'saga_' + runId + '@test.com');",
+              "",
+              "// Numeric IDs are kept safely inside Java Long / JS safe integer range.",
+              "const numericBase = Number(now.slice(-8)) * 10 + Number(randomPart.slice(-1));",
+              "pm.collectionVariables.set('productId', String(numericBase));",
+              "pm.collectionVariables.set('missingProductId', String(numericBase + 1));",
+              "",
+              "pm.collectionVariables.set('successSlot', 'success-' + runId);",
+              "pm.collectionVariables.set('deliveryFailureSlot', 'delivery-fail-' + runId);",
+              "pm.collectionVariables.set('warehouseFailureSlot', 'warehouse-fail-' + runId);"
+            ]
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('1. User created: HTTP 201', function () { pm.response.to.have.status(201); });",
+              "const j = pm.response.json();",
+              "pm.test('1. User id returned', function () { pm.expect(j.id).to.exist; });",
+              "pm.test('1. Username is unique run username', function () {",
+              "    pm.expect(j.username).to.eql(pm.collectionVariables.get('username'));",
+              "});",
+              "pm.collectionVariables.set('userId', String(j.id));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "2. Wait for billing account and deposit 1000",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "http://{{baseUrl}}/billing/{{userId}}/deposit",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "protocol": "http",
+          "path": [
+            "billing",
+            "{{userId}}",
+            "deposit"
+          ]
+        },
+        "description": "",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"amount\": {{depositAmount}}\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const base = 'http://' + (pm.environment.get('baseUrl') || pm.collectionVariables.get('baseUrl'));",
+              "const uid = pm.collectionVariables.get('userId');",
+              "let attempts = 0;",
+              "const maxAttempts = 15;",
+              "",
+              "function waitForBilling() {",
+              "    attempts++;",
+              "    pm.sendRequest(`${base}/billing/${uid}`, function (err, res) {",
+              "        if (!err && res.code === 200) {",
+              "            console.log(`Billing account ready after ${attempts} attempt(s)`);",
+              "            return;",
+              "        }",
+              "        if (attempts < maxAttempts) {",
+              "            setTimeout(waitForBilling, 400);",
+              "        } else {",
+              "            console.warn('Billing account was not ready before deposit request');",
+              "        }",
+              "    });",
+              "}",
+              "waitForBilling();"
+            ]
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('2. Deposit successful: HTTP 200', function () { pm.response.to.have.status(200); });",
+              "const j = pm.response.json();",
+              "pm.test('2. Balance is 1000', function () {",
+              "    pm.expect(Number(j.balance)).to.eql(Number(pm.collectionVariables.get('depositAmount')));",
+              "});",
+              "pm.test('2. Billing account belongs to created user', function () {",
+              "    pm.expect(String(j.userId)).to.eql(pm.collectionVariables.get('userId'));",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "3. Prepare unique warehouse product",
+      "request": {
+        "method": "PUT",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "http://{{baseUrl}}/warehouse/stock/{{productId}}",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "protocol": "http",
+          "path": [
+            "warehouse",
+            "stock",
+            "{{productId}}"
+          ]
+        },
+        "description": "",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"quantity\": {{initialStock}}\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('3. Warehouse stock prepared', function () { pm.response.to.have.status(200); });",
+              "const j = pm.response.json();",
+              "pm.test('3. Available stock = 10', function () { pm.expect(Number(j.availableQuantity)).to.eql(10); });",
+              "pm.test('3. Reserved stock = 0', function () { pm.expect(Number(j.reservedQuantity)).to.eql(0); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "4. Prepare successful delivery slot",
+      "request": {
+        "method": "PUT",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "http://{{baseUrl}}/delivery/slots/{{successSlot}}",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "protocol": "http",
+          "path": [
+            "delivery",
+            "slots",
+            "{{successSlot}}"
+          ]
+        },
+        "description": "",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"couriers\": 1\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('4. Success slot prepared', function () { pm.response.to.have.status(200); });",
+              "const j = pm.response.json();",
+              "pm.test('4. One courier available', function () { pm.expect(Number(j.availableCouriers)).to.eql(1); });",
+              "pm.test('4. No courier reserved yet', function () { pm.expect(Number(j.reservedCouriers)).to.eql(0); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "5. Create successful Saga order",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "http://{{baseUrl}}/orders/saga",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "protocol": "http",
+          "path": [
+            "orders",
+            "saga"
+          ]
+        },
+        "description": "",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"userId\": {{userId}},\n  \"productId\": {{productId}},\n  \"quantity\": {{successQty}},\n  \"price\": {{successPrice}},\n  \"deliverySlot\": \"{{successSlot}}\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('5. Saga response: HTTP 200', function () { pm.response.to.have.status(200); });",
+              "const j = pm.response.json();",
+              "pm.test('5. Order status = COMPLETED', function () { pm.expect(j.status).to.eql('COMPLETED'); });",
+              "pm.test('5. No failureReason', function () { pm.expect(j.failureReason).to.be.oneOf([null, undefined, '']); });",
+              "pm.collectionVariables.set('successOrderId', String(j.id));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "6. Verify Billing after successful Saga",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "http://{{baseUrl}}/billing/{{userId}}",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "protocol": "http",
+          "path": [
+            "billing",
+            "{{userId}}"
+          ]
+        },
+        "description": ""
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('6. Billing response: HTTP 200', function () { pm.response.to.have.status(200); });",
+              "const j = pm.response.json();",
+              "pm.test('6. Balance decreased to 700', function () { pm.expect(Number(j.balance)).to.eql(700); });",
+              "pm.collectionVariables.set('balanceAfterSuccess', String(j.balance));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "7. Verify Warehouse after successful Saga",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "http://{{baseUrl}}/warehouse/stock/{{productId}}",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "protocol": "http",
+          "path": [
+            "warehouse",
+            "stock",
+            "{{productId}}"
+          ]
+        },
+        "description": ""
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('7. Warehouse response: HTTP 200', function () { pm.response.to.have.status(200); });",
+              "const j = pm.response.json();",
+              "pm.test('7. Available stock = 8', function () { pm.expect(Number(j.availableQuantity)).to.eql(8); });",
+              "pm.test('7. Reserved stock = 2', function () { pm.expect(Number(j.reservedQuantity)).to.eql(2); });",
+              "pm.collectionVariables.set('stockAvailableAfterSuccess', String(j.availableQuantity));",
+              "pm.collectionVariables.set('stockReservedAfterSuccess', String(j.reservedQuantity));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "8. Verify Delivery after successful Saga",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "http://{{baseUrl}}/delivery/slots/{{successSlot}}",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "protocol": "http",
+          "path": [
+            "delivery",
+            "slots",
+            "{{successSlot}}"
+          ]
+        },
+        "description": ""
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('8. Delivery response: HTTP 200', function () { pm.response.to.have.status(200); });",
+              "const j = pm.response.json();",
+              "pm.test('8. Available couriers = 0', function () { pm.expect(Number(j.availableCouriers)).to.eql(0); });",
+              "pm.test('8. Reserved couriers = 1', function () { pm.expect(Number(j.reservedCouriers)).to.eql(1); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "9. Prepare slot with zero couriers",
+      "request": {
+        "method": "PUT",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "http://{{baseUrl}}/delivery/slots/{{deliveryFailureSlot}}",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "protocol": "http",
+          "path": [
+            "delivery",
+            "slots",
+            "{{deliveryFailureSlot}}"
+          ]
+        },
+        "description": "",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"couriers\": 0\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('9. Failure slot prepared', function () { pm.response.to.have.status(200); });",
+              "const j = pm.response.json();",
+              "pm.test('9. Available couriers = 0', function () { pm.expect(Number(j.availableCouriers)).to.eql(0); });",
+              "pm.test('9. Reserved couriers = 0', function () { pm.expect(Number(j.reservedCouriers)).to.eql(0); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "10. Create Saga that fails on Delivery",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "http://{{baseUrl}}/orders/saga",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "protocol": "http",
+          "path": [
+            "orders",
+            "saga"
+          ]
+        },
+        "description": "",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"userId\": {{userId}},\n  \"productId\": {{productId}},\n  \"quantity\": {{deliveryFailureQty}},\n  \"price\": {{deliveryFailurePrice}},\n  \"deliverySlot\": \"{{deliveryFailureSlot}}\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('10. Saga handled failure: HTTP 200', function () { pm.response.to.have.status(200); });",
+              "const j = pm.response.json();",
+              "pm.test('10. Order status = FAILED', function () { pm.expect(j.status).to.eql('FAILED'); });",
+              "pm.test('10. failureReason contains Delivery conflict', function () {",
+              "    pm.expect(String(j.failureReason)).to.include('409');",
+              "    pm.expect(String(j.failureReason)).to.include('/delivery/reservations');",
+              "});",
+              "pm.collectionVariables.set('deliveryFailedOrderId', String(j.id));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "11. Verify Billing refund after Delivery failure",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "http://{{baseUrl}}/billing/{{userId}}",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "protocol": "http",
+          "path": [
+            "billing",
+            "{{userId}}"
+          ]
+        },
+        "description": ""
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('11. Billing response: HTTP 200', function () { pm.response.to.have.status(200); });",
+              "const j = pm.response.json();",
+              "pm.test('11. Balance returned to pre-failure value', function () {",
+              "    pm.expect(Number(j.balance)).to.eql(Number(pm.collectionVariables.get('balanceAfterSuccess')));",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "12. Verify Warehouse release after Delivery failure",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "http://{{baseUrl}}/warehouse/stock/{{productId}}",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "protocol": "http",
+          "path": [
+            "warehouse",
+            "stock",
+            "{{productId}}"
+          ]
+        },
+        "description": ""
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('12. Warehouse response: HTTP 200', function () { pm.response.to.have.status(200); });",
+              "const j = pm.response.json();",
+              "pm.test('12. Available quantity restored', function () {",
+              "    pm.expect(Number(j.availableQuantity)).to.eql(Number(pm.collectionVariables.get('stockAvailableAfterSuccess')));",
+              "});",
+              "pm.test('12. Reserved quantity restored', function () {",
+              "    pm.expect(Number(j.reservedQuantity)).to.eql(Number(pm.collectionVariables.get('stockReservedAfterSuccess')));",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "13. Verify failed Delivery slot remains unreserved",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "http://{{baseUrl}}/delivery/slots/{{deliveryFailureSlot}}",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "protocol": "http",
+          "path": [
+            "delivery",
+            "slots",
+            "{{deliveryFailureSlot}}"
+          ]
+        },
+        "description": ""
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('13. Delivery response: HTTP 200', function () { pm.response.to.have.status(200); });",
+              "const j = pm.response.json();",
+              "pm.test('13. No courier became reserved', function () { pm.expect(Number(j.reservedCouriers)).to.eql(0); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "14. Prepare product with zero stock",
+      "request": {
+        "method": "PUT",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "http://{{baseUrl}}/warehouse/stock/{{missingProductId}}",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "protocol": "http",
+          "path": [
+            "warehouse",
+            "stock",
+            "{{missingProductId}}"
+          ]
+        },
+        "description": "",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"quantity\": 0\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('14. Zero-stock product prepared', function () { pm.response.to.have.status(200); });",
+              "const j = pm.response.json();",
+              "pm.test('14. Available stock = 0', function () { pm.expect(Number(j.availableQuantity)).to.eql(0); });",
+              "pm.test('14. Reserved stock = 0', function () { pm.expect(Number(j.reservedQuantity)).to.eql(0); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "15. Prepare untouched delivery slot",
+      "request": {
+        "method": "PUT",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "http://{{baseUrl}}/delivery/slots/{{warehouseFailureSlot}}",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "protocol": "http",
+          "path": [
+            "delivery",
+            "slots",
+            "{{warehouseFailureSlot}}"
+          ]
+        },
+        "description": "",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"couriers\": 1\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('15. Warehouse-failure delivery slot prepared', function () { pm.response.to.have.status(200); });",
+              "const j = pm.response.json();",
+              "pm.test('15. One courier available before Saga', function () { pm.expect(Number(j.availableCouriers)).to.eql(1); });",
+              "pm.test('15. No courier reserved before Saga', function () { pm.expect(Number(j.reservedCouriers)).to.eql(0); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "16. Create Saga that fails on Warehouse",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "http://{{baseUrl}}/orders/saga",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "protocol": "http",
+          "path": [
+            "orders",
+            "saga"
+          ]
+        },
+        "description": "",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"userId\": {{userId}},\n  \"productId\": {{missingProductId}},\n  \"quantity\": {{warehouseFailureQty}},\n  \"price\": {{warehouseFailurePrice}},\n  \"deliverySlot\": \"{{warehouseFailureSlot}}\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('16. Saga handled Warehouse failure: HTTP 200', function () { pm.response.to.have.status(200); });",
+              "const j = pm.response.json();",
+              "pm.test('16. Order status = FAILED', function () { pm.expect(j.status).to.eql('FAILED'); });",
+              "pm.test('16. failureReason contains Warehouse conflict', function () {",
+              "    pm.expect(String(j.failureReason)).to.include('409');",
+              "    pm.expect(String(j.failureReason)).to.include('/warehouse/reservations');",
+              "});",
+              "pm.collectionVariables.set('warehouseFailedOrderId', String(j.id));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "17. Verify Billing refund after Warehouse failure",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "http://{{baseUrl}}/billing/{{userId}}",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "protocol": "http",
+          "path": [
+            "billing",
+            "{{userId}}"
+          ]
+        },
+        "description": ""
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('17. Billing response: HTTP 200', function () { pm.response.to.have.status(200); });",
+              "const j = pm.response.json();",
+              "pm.test('17. Balance unchanged after compensation', function () {",
+              "    pm.expect(Number(j.balance)).to.eql(Number(pm.collectionVariables.get('balanceAfterSuccess')));",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "18. Verify Delivery was not reserved after Warehouse failure",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "http://{{baseUrl}}/delivery/slots/{{warehouseFailureSlot}}",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "protocol": "http",
+          "path": [
+            "delivery",
+            "slots",
+            "{{warehouseFailureSlot}}"
+          ]
+        },
+        "description": ""
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('18. Delivery response: HTTP 200', function () { pm.response.to.have.status(200); });",
+              "const j = pm.response.json();",
+              "pm.test('18. Courier availability unchanged', function () { pm.expect(Number(j.availableCouriers)).to.eql(1); });",
+              "pm.test('18. No courier reserved', function () { pm.expect(Number(j.reservedCouriers)).to.eql(0); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "19. Verify zero-stock product unchanged",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "http://{{baseUrl}}/warehouse/stock/{{missingProductId}}",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "protocol": "http",
+          "path": [
+            "warehouse",
+            "stock",
+            "{{missingProductId}}"
+          ]
+        },
+        "description": ""
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('19. Warehouse response: HTTP 200', function () { pm.response.to.have.status(200); });",
+              "const j = pm.response.json();",
+              "pm.test('19. Available stock remains 0', function () { pm.expect(Number(j.availableQuantity)).to.eql(0); });",
+              "pm.test('19. Reserved stock remains 0', function () { pm.expect(Number(j.reservedQuantity)).to.eql(0); });"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}
